@@ -5,7 +5,7 @@ const crypto = require('crypto')
 const salt = ''
 function criarHash(senha, salt){
     const hash = crypto.createHmac('sha256', salt)
-                       .update(senha)
+                       .update(String(senha))
                        .digest('hex')
 
     return hash
@@ -13,6 +13,13 @@ function criarHash(senha, salt){
 
 async function authenticate(req, res) {
     const authHeader = req.headers["authorization"]
+
+    if (!authHeader || !authHeader.startsWith("Basic ")) {
+        console.log("Authorization header missing");
+        return false
+    }
+
+
     const base64Credentials = authHeader.split(" ")[1];
     const credentials = Buffer.from(base64Credentials, "base64").toString("utf8");
     const [userAuth, passAuth] = credentials.split(":");

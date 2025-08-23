@@ -2,11 +2,14 @@ const sql = require('mssql')
 const dbConfig = require('../../dbConfig/dbConfig')
 const {authenticate} = require('../../auth/auth')
 const crypto = require('crypto')
+const jwt = require("jsonwebtoken");
+const { jwt_token } = require('../../dbConfig/secrets')
+
 
 const salt = ''
 function criarHash(senha, salt){
     const hash = crypto.createHmac('sha256', salt)
-                       .update(senha)
+                       .update(String(senha))
                        .digest('hex')
 
     return hash
@@ -15,8 +18,6 @@ function criarHash(senha, salt){
 async function teste(req,res) {
     res.status(201).json({message: 'Hello world'})
 }
-
-
 
 
 async function login(req,res) {
@@ -29,7 +30,7 @@ async function login(req,res) {
     const hashedPass = criarHash(pass, salt);
     const userEmployee = {mail, pass}
     for(const [key, value] of Object.entries(userEmployee)){
-        if(!value){
+        if(!value || value == 0){
             return res.status(400).json({message: `O campo '' ${key} '' é obrigatório.`, status: 0})
         }
     }
@@ -38,31 +39,33 @@ async function login(req,res) {
         const pool = await sql.connect(dbConfig.dbMain)
         const result = await pool.request().query(`
             SELECT
+                FUNCIONARIO,
                 NOME,
-                SOBRENOME
                 EMAIL,
                 SENHA,
-                EMPRESA,
-                FILIAL,
-                CARGO,
                 STATUS
                 FROM FUNCIONARIOS
                 WHERE EMAIL = '${mail}'
         `)
-        const employee = result.recordset[0]
-
-        if(!employee || !employee.STATUS){
+        const user = result.recordset[0]
+        if(!user || !user.STATUS){
             console.log('mail not registered')
             return res.status(400).json({message: `E-mail não cadastrado.`, status: 0})
         }
         
-        if(hashedPass !== employee.SENHA){
+        if(hashedPass !== user.SENHA){
             console.log('invalid pass')
             return res.status(400).json({message: `Senha inválida.`, status: 0})
         }
+        const JWT_SECRET = jwt_token
+        const token = jwt.sign(
+            { id: user.FUNCIONARIO, email: user.EMAIL },
+            JWT_SECRET,
+            { expiresIn: "72h" }
+        )
 
-        const token = crypto.randomBytes(32).toString("hex");
-        res.status(201).json({message: `Bem vindo ${employee.NOME}.`, token: token, status: 1})
+        console.log(token)
+        res.status(200).json({message: `Bem vindo ${user.NOME}.`, token: token, status: 1})
 
 
     } catch (error){
