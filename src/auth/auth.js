@@ -4,9 +4,7 @@ const crypto = require('crypto')
 
 const salt = ''
 function criarHash(senha, salt){
-    const hash = crypto.createHmac('sha256', salt)
-                       .update(String(senha))
-                       .digest('hex')
+    const hash = crypto.createHmac('sha256', salt).update(String(senha)).digest('hex')
 
     return hash
 }

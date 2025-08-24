@@ -3,14 +3,12 @@ const dbConfig = require('../../dbConfig/dbConfig')
 const {authenticate} = require('../../auth/auth')
 const crypto = require('crypto')
 const jwt = require("jsonwebtoken");
-const { jwt_token } = require('../../dbConfig/secrets')
+const { JWT_SECRET_ACCESS, JWT_SECRET_REFRESH } = require('../../dbConfig/secrets')
 
 
 const salt = ''
 function criarHash(senha, salt){
-    const hash = crypto.createHmac('sha256', salt)
-                       .update(String(senha))
-                       .digest('hex')
+    const hash = crypto.createHmac('sha256', salt).update(String(senha)).digest('hex')
 
     return hash
 }
@@ -20,13 +18,24 @@ async function teste(req,res) {
 }
 
 
+async function logout(req,res) {
+    const authHeader = req.headers["authorization"];
+    console.log(authHeader)
+
+    if(!authHeader || !authHeader.startsWith("Bearer ")){
+        return res.status(401).json({ message: "Token não fornecido", status: 0 })
+    }
+
+    res.status(201).json({message: `Você saiu`, status: 1})
+}
+
 async function login(req,res) {
     const auth = await authenticate(req, res)
     if(!auth){
         return res.status(401).send('User refused.')
     }
 
-    const {mail, pass} = req.body
+    const {mail, pass, deviceInfo} = req.body
     const hashedPass = criarHash(pass, salt);
     const userEmployee = {mail, pass}
     for(const [key, value] of Object.entries(userEmployee)){
@@ -57,15 +66,55 @@ async function login(req,res) {
             console.log('invalid pass')
             return res.status(400).json({message: `Senha inválida.`, status: 0})
         }
-        const JWT_SECRET = jwt_token
-        const token = jwt.sign(
+        
+        const accessToken = jwt.sign(
             { id: user.FUNCIONARIO, email: user.EMAIL },
-            JWT_SECRET,
-            { expiresIn: "72h" }
+            JWT_SECRET_ACCESS,
+            { expiresIn: "1m" }
         )
 
-        console.log(token)
-        res.status(200).json({message: `Bem vindo ${user.NOME}.`, token: token, status: 1})
+        const refreshToken = jwt.sign(
+            { id: user.FUNCIONARIO, email: user.EMAIL },
+            JWT_SECRET_REFRESH,
+            { expiresIn: "2m" }
+        )
+
+        await pool.request().query(`
+            DELETE FROM FUNCIONARIOS_REFRESH_TOKENS
+            WHERE EXPIRES_AT < GETDATE() AND EMAIL = '${user.EMAIL}'
+        `)
+
+        await pool.request().query(`
+            INSERT INTO FUNCIONARIOS_REFRESH_TOKENS (
+                FUNCIONARIO,
+                NOME,
+                EMAIL,
+                REFRESH_TOKEN,
+                EXPIRES_AT,
+                DEVICE_INFO
+                )
+            VALUES (
+                ${user.FUNCIONARIO},
+                '${user.NOME}',
+                '${user.EMAIL}',
+                '${refreshToken}',
+                DATEADD(MINUTE, 2, GETDATE()),
+                '${deviceInfo}'
+            )
+        `)
+
+        res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,          
+        secure: false,           // false no localhost, true em produção https
+        sameSite: "Lax",         // pode usar "Strict" em produção
+        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        path: "/"                
+        });
+
+        
+
+        console.log(accessToken)
+        res.status(200).json({message: `Bem vindo ${user.NOME}.`, accessToken: accessToken, status: 1})
 
 
     } catch (error){
@@ -189,5 +238,6 @@ module.exports = {
     teste,
     register,
     login,
+    logout,
 }
 
