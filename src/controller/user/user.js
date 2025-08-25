@@ -18,16 +18,47 @@ async function teste(req,res) {
 }
 
 
-async function logout(req,res) {
-    const authHeader = req.headers["authorization"];
-    console.log(authHeader)
 
-    if(!authHeader || !authHeader.startsWith("Bearer ")){
-        return res.status(401).json({ message: "Token não fornecido", status: 0 })
+
+
+async function logout(req,res) {
+    const refreshToken = req.cookies.refreshToken
+    console.log(refreshToken)
+
+    if(!refreshToken){
+        console.log('Não possui refresh em cookie')
+        return res.status(201).json({message: `Não possui refresh em token`, status: 1})
     }
 
+    try {
+        const pool = await sql.connect(dbConfig.dbMain)
+        await pool.request().query(`
+            IF EXISTS (SELECT 1 
+                    FROM FUNCIONARIOS_REFRESH_TOKENS 
+                    WHERE REFRESH_TOKEN = '${refreshToken}'
+                    )
+            BEGIN
+                DELETE FROM FUNCIONARIOS_REFRESH_TOKENS
+                WHERE REFRESH_TOKEN = '${refreshToken}'
+            END
+        `)
+
+        res.clearCookie("refreshToken", {
+                httpOnly: true,
+                secure: false,
+                sameSite: "strict"
+                })
+    } catch (error){
+        console.error(error)
+        res.status(400).json({error})
+    } finally {
+        sql.close()
+    }
     res.status(201).json({message: `Você saiu`, status: 1})
 }
+
+
+
 
 async function login(req,res) {
     const auth = await authenticate(req, res)
@@ -104,11 +135,11 @@ async function login(req,res) {
         `)
 
         res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,          
-        secure: false,           // false no localhost, true em produção https
-        sameSite: "Lax",         // pode usar "Strict" em produção
-        maxAge: 7 * 24 * 60 * 60 * 1000, 
-        path: "/"                
+            httpOnly: true,          
+            secure: false,           // false no localhost, true em produção https
+            sameSite: "Lax",         // pode usar "Strict" em produção
+            maxAge: 7 * 24 * 60 * 60 * 1000, 
+            path: "/"                
         });
 
         
