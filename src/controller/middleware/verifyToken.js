@@ -47,13 +47,18 @@ async function generateAccessToken(req,res) {
         try {
             const pool = await sql.connect(dbConfig.dbMain)
             const request = await pool.request().query(`
-                SELECT * FROM FUNCIONARIOS_REFRESH_TOKENS WHERE REFRESH_TOKEN = '${refreshToken}'
+                SELECT
+                    B.*,
+                    A.REFRESH_TOKEN
+                FROM FUNCIONARIOS_REFRESH_TOKENS AS A
+                    JOIN FUNCIONARIOS AS B ON A.FUNCIONARIO = B.FUNCIONARIO 
+                WHERE REFRESH_TOKEN = '${refreshToken}'
             `)
-            const verifyDbToken = request.recordset[0]
+            const user = request.recordset[0]
 
-            console.log(verifyDbToken)
+            console.log(user)
             
-            if(!verifyDbToken){
+            if(!user){
                 console.log('refresh token não esta no banco')
                 return res.status(401).json({ message: "Token inválido ou expirado, refaça o login", status: 0 })
             }
@@ -63,10 +68,18 @@ async function generateAccessToken(req,res) {
             console.log(decoded)
 
             const accessToken = jwt.sign(
-                        { id: verifyDbToken.ID, email: verifyDbToken.EMAIL },
-                        JWT_SECRET_ACCESS,
-                        { expiresIn: "1m" }
-                    )
+                {   
+                    id: user.FUNCIONARIO,
+                    name: user.NOME,
+                    surname: user.SOBRENOME,
+                    business: user.EMPRESA,
+                    branch: user.FILIAL,
+                    position: user.CARGO,
+                    email: user.EMAIL,
+                },
+                JWT_SECRET_ACCESS,
+                { expiresIn: "1m" }
+            )
             
             console.log(`New access token: ${accessToken}`)
             res.json({ message: "Refresh Token válido!", accessToken, status: 1 })

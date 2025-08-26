@@ -79,11 +79,7 @@ async function login(req,res) {
         const pool = await sql.connect(dbConfig.dbMain)
         const result = await pool.request().query(`
             SELECT
-                FUNCIONARIO,
-                NOME,
-                EMAIL,
-                SENHA,
-                STATUS
+                *
                 FROM FUNCIONARIOS
                 WHERE EMAIL = '${mail}'
         `)
@@ -99,7 +95,15 @@ async function login(req,res) {
         }
         
         const accessToken = jwt.sign(
-            { id: user.FUNCIONARIO, email: user.EMAIL },
+            {   
+                id: user.FUNCIONARIO,
+                name: user.NOME,
+                surname: user.SOBRENOME,
+                business: user.EMPRESA,
+                branch: user.FILIAL,
+                position: user.CARGO,
+                email: user.EMAIL,
+            },
             JWT_SECRET_ACCESS,
             { expiresIn: "1m" }
         )
