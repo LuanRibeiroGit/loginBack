@@ -1,6 +1,7 @@
 const express = require('express')
 const cookieParser = require('cookie-parser');
-const userRoutes = require('./src/routes/user')
+const authRoutes = require('./src/routes/barber/auth')
+const barberRoutes = require('./src/routes/barber/barber')
 const cors = require('cors');
 
 const app = express()
@@ -13,7 +14,7 @@ app.use(cors({
 
 app.use(express.json())
 app.use(cookieParser())
-app.use('/', userRoutes)
+app.use('/', authRoutes, barberRoutes)
 
 
 app.listen(port, ()=>{

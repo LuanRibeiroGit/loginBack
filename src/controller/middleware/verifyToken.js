@@ -22,10 +22,9 @@ async function verifyToken(req, res, next){
     try {
         const decoded = jwt.verify(token, JWT_SECRET_ACCESS)
         req.user = decoded
-        console.log(req.user)
+        //console.log(req.user)
 
         next()
-        res.json({ message: "Token válido!", user: req.user, status: 1 })
     } catch (err) {
         return res.status(401).json({ message: "Token inválido ou expirado", status: 0 })
     }
@@ -74,11 +73,11 @@ async function generateAccessToken(req,res) {
                     surname: user.SOBRENOME,
                     business: user.EMPRESA,
                     branch: user.FILIAL,
-                    position: user.CARGO,
+                    role: user.CARGO,
                     email: user.EMAIL,
                 },
                 JWT_SECRET_ACCESS,
-                { expiresIn: "1m" }
+                { expiresIn: "30m" }
             )
             
             console.log(`New access token: ${accessToken}`)
@@ -125,5 +124,5 @@ async function generateAccessToken(req,res) {
 
 module.exports = {
     verifyToken,
-    generateAccessToken
+    generateAccessToken,
 }
